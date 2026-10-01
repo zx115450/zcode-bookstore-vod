@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lite VOD 演示页</title>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.17"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b9bb4;
+      --accent: #3d8bfd;
+      --ok: #7fd99a;
+      --err: #f07178;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(1200px 600px at 20% -10%, #1e3a5f 0%, var(--bg) 55%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    main { width: min(720px, 100%); }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.35rem; }
+    h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid #2c3a4f;
+    }
+    .hint { color: var(--muted); font-size: 0.875rem; margin: 0 0 1rem; }
+    .row {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+    input[type="text"] {
+      flex: 1 1 220px;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #2c3a4f;
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: var(--accent); }
+    input[type="file"] {
+      flex: 1 1 220px;
+      color: var(--muted);
+      font-size: 0.875rem;
+    }
+    button {
+      padding: 0.6rem 1rem;
+      border: 0;
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button.secondary { background: #2c3a4f; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .msg {
+      min-height: 1.25rem;
+      font-size: 0.875rem;
+      margin: 0 0 0.5rem;
+      white-space: pre-wrap;
+    }
+    .msg.err { color: var(--err); }
+    .msg.ok { color: var(--ok); }
+    .msg.info { color: var(--muted); }
+    #url {
+      color: var(--muted);
+      font-size: 0.75rem;
+      word-break: break-all;
+      margin: 0 0 0.75rem;
+    }
+    video {
+      width: 100%;
+      background: #000;
+      border-radius: 8px;
+      aspect-ratio: 16 / 9;
+    }
+    .bar-wrap {
+      height: 6px;
+      background: #2c3a4f;
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 0 0 0.75rem;
+      display: none;
+    }
+    .bar-wrap.on { display: block; }
+    .bar {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.15s linear;
+    }
+    .abr-panel {
+      display: none;
+      margin: 0 0 0.75rem;
+      padding: 0.65rem 0.75rem;
+      background: var(--panel);
+      border: 1px solid #2c3a4f;
+      border-radius: 6px;
+    }
+    .abr-panel.on { display: block; }
+    .abr-meta {
+      color: var(--muted);
+      font-size: 0.8rem;
+      margin: 0 0 0.5rem;
+    }
+    .abr-levels {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .abr-levels button {
+      padding: 0.35rem 0.7rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: #2c3a4f;
+    }
+    .abr-levels button.active {
+      background: var(--accent);
+    }
+    #qualitySelect {
+      flex: 0 1 220px;
+      padding: 0.4rem 0.6rem;
+      border: 1px solid #2c3a4f;
+      border-radius: 6px;
+      background: #121a26;
+      color: var(--text);
+      font-size: 0.85rem;
+    }
+    input[type="number"] {
+      flex: 0 0 110px;
+      width: 110px;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #2c3a4f;
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--text);
+      outline: none;
+    }
+    input[type="number"]:focus { border-color: var(--accent); }
+    .preview-badge {
+      display: none;
+      margin: 0 0 0.75rem;
+      padding: 0.45rem 0.7rem;
+      border-radius: 6px;
+      background: rgba(61, 139, 253, 0.15);
+      border: 1px solid rgba(61, 139, 253, 0.45);
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+    .preview-badge.on { display: block; }
+    button.preview { background: #5b8def; }
+    .player-shell {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .player-shell video {
+      display: block;
+      width: 100%;
+      border-radius: 0;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+    .preview-controls {
+      display: none;
+      padding: 0.55rem 0.75rem 0.7rem;
+      background: linear-gradient(180deg, transparent, rgba(0,0,0,0.85));
+      margin-top: -3.2rem;
+      position: relative;
+      z-index: 2;
+    }
+    .preview-controls.on { display: block; }
+    .preview-controls .ctrl-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+      margin-bottom: 0.4rem;
+    }
+    .preview-controls .ctrl-row button {
+      padding: 0.3rem 0.65rem;
+      font-size: 0.8rem;
+      min-width: 2.4rem;
+    }
+    .preview-time {
+      color: #c9d4e5;
+      font-size: 0.75rem;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .preview-seek {
+      position: relative;
+      height: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+    }
+    .preview-seek-track {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 5px;
+      border-radius: 3px;
+      background: #2c3a4f;
+      overflow: hidden;
+    }
+    .preview-seek-playable {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      background: rgba(61, 139, 253, 0.35);
+    }
+    .preview-seek-played {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 0%;
+      background: var(--accent);
+    }
+    .preview-seek-thumb {
+      position: absolute;
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      margin-left: -6px;
+      margin-top: -6px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 2px rgba(61, 139, 253, 0.6);
+      left: 0%;
+      pointer-events: none;
+    }
+    .preview-lock-tip {
+      display: none;
+      margin-top: 0.35rem;
+      color: #f0c674;
+      font-size: 0.75rem;
+    }
+    .preview-lock-tip.on { display: block; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Lite VOD 演示页</h1>
+    <p class="hint">两种转码模式（整文件直传）：「一次出齐」等全部档转完再播；「渐进式」先出低清可播，再后台补高清。commit 时传 progressive 与 previewSeconds（上传方定试看时长）。播放：可播(PLAYABLE)或已完成(FINISHED)均可申请。试看：preview.m3u8 + 自定义进度条（显示整片时长，仅前 N 秒可拖可播）。</p>
+
+    <h2>1. 上传</h2>
+    <div class="row">
+      <input id="fileInput" type="file" accept="video/mp4,video/*,.mp4" />
+      <button id="uploadFullBtn" type="button">一次出齐上传</button>
+      <button id="uploadProgBtn" type="button" class="secondary">渐进式上传</button>
+    </div>
+    <div class="row">
+      <label for="previewSecondsInput" style="color:var(--muted);font-size:0.8rem;white-space:nowrap">试看秒数</label>
+      <input id="previewSecondsInput" type="number" min="0" step="1" value="30" title="上传方指定；0=不生成试看；空则用服务端默认" />
+    </div>
+    <div id="uploadBarWrap" class="bar-wrap"><div id="uploadBar" class="bar"></div></div>
+    <p id="uploadMsg" class="msg info"></p>
+
+    <h2>2. 播放 / 试看</h2>
+    <div class="row">
+      <input id="fileId" type="text" placeholder="fileId（上传后自动填入）" autocomplete="off" />
+      <button id="playBtn" type="button">申请播放</button>
+      <button id="previewBtn" type="button" class="preview">试看</button>
+      <button id="refreshBtn" type="button" class="secondary">查状态</button>
+    </div>
+    <p id="err" class="msg err"></p>
+    <p id="url"></p>
+    <div id="previewBadge" class="preview-badge"></div>
+    <div id="abrPanel" class="abr-panel">
+      <p id="abrMeta" class="abr-meta"></p>
+      <div class="row" style="margin-bottom:0.35rem">
+        <label for="qualitySelect" style="color:var(--muted);font-size:0.8rem;white-space:nowrap">清晰度</label>
+        <select id="qualitySelect" aria-label="清晰度">
+          <option value="auto">Auto（自适应）</option>
+        </select>
+      </div>
+      <div id="abrLevels" class="abr-levels"></div>
+    </div>
+    <div class="player-shell">
+      <video id="video" controls playsinline></video>
+      <div id="previewControls" class="preview-controls" aria-label="试看播放控件">
+        <div class="ctrl-row">
+          <button id="previewPlayBtn" type="button" title="播放/暂停">▶</button>
+          <span id="previewTimeLabel" class="preview-time">0:00 / 0:00</span>
+        </div>
+        <div id="previewSeek" class="preview-seek" role="slider" aria-valuemin="0" tabindex="0">
+          <div class="preview-seek-track">
+            <div id="previewSeekPlayable" class="preview-seek-playable"></div>
+            <div id="previewSeekPlayed" class="preview-seek-played"></div>
+          </div>
+          <div id="previewSeekThumb" class="preview-seek-thumb"></div>
+        </div>
+        <p id="previewLockTip" class="preview-lock-tip">试看结束，购买后可观看完整内容</p>
+      </div>
+    </div>
+  </main>
+  <script>
+    (function () {
+      const API_BASE = '/vod';
+      let hls;
+      let pollTimer;
+
+      const fileInput = document.getElementById('fileInput');
+      const uploadFullBtn = document.getElementById('uploadFullBtn');
+      const uploadProgBtn = document.getElementById('uploadProgBtn');
+      const uploadMsg = document.getElementById('uploadMsg');
+      const uploadBarWrap = document.getElementById('uploadBarWrap');
+      const uploadBar = document.getElementById('uploadBar');
+      const fileIdEl = document.getElementById('fileId');
+      const playBtn = document.getElementById('playBtn');
+      const previewBtn = document.getElementById('previewBtn');
+      const previewSecondsInput = document.getElementById('previewSecondsInput');
+      const refreshBtn = document.getElementById('refreshBtn');
+      const errEl = document.getElementById('err');
+      const urlEl = document.getElementById('url');
+      const previewBadge = document.getElementById('previewBadge');
+      const previewControls = document.getElementById('previewControls');
+      const previewPlayBtn = document.getElementById('previewPlayBtn');
+      const previewTimeLabel = document.getElementById('previewTimeLabel');
+      const previewSeek = document.getElementById('previewSeek');
+      const previewSeekPlayable = document.getElementById('previewSeekPlayable');
+      const previewSeekPlayed = document.getElementById('previewSeekPlayed');
+      const previewSeekThumb = document.getElementById('previewSeekThumb');
+      const previewLockTip = document.getElementById('previewLockTip');
+      const abrPanel = document.getElementById('abrPanel');
+      const abrMeta = document.getElementById('abrMeta');
+      const abrLevels = document.getElementById('abrLevels');
+      const qualitySelect = document.getElementById('qualitySelect');
+      const video = document.getElementById('video');
+
+      /** @type {{ mode: 'hls'|'native', masterUrl: string, variants: Array<{label:string,url:string,bandwidth?:number,height?:number}> } | null} */
+      let qualityState = null;
+      let levelSwitchedHandler = null;
+
+      /** 试看自定义进度条状态 */
+      let previewUi = {
+        active: false,
+        fullDuration: 0,
+        previewSeconds: 0,
+        seeking: false
+      };
+
+      function setUploadMsg(text, kind) {
+        uploadMsg.textContent = text || '';
+        uploadMsg.className = 'msg ' + (kind || 'info');
+      }
+
+      function hidePreviewBadge() {
+        previewBadge.classList.remove('on');
+        previewBadge.textContent = '';
+      }
+
+      function showPreviewBadge(seconds, fullDuration) {
+        previewBadge.classList.add('on');
+        const secHint = seconds > 0 ? ('可播前 ' + seconds + ' 秒') : '见 preview.m3u8';
+        const fullHint = fullDuration > 0 ? ('；进度条按整片 ' + formatClock(fullDuration) + ' 显示') : '';
+        previewBadge.textContent = '试看模式：' + secHint + fullHint + '（清单为 preview.m3u8）';
+      }
+
+      function formatClock(sec) {
+        if (!Number.isFinite(sec) || sec < 0) sec = 0;
+        sec = Math.floor(sec);
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        const mm = (h > 0 ? String(m).padStart(2, '0') : String(m));
+        const ss = String(s).padStart(2, '0');
+        return h > 0 ? (h + ':' + mm + ':' + ss) : (mm + ':' + ss);
+      }
+
+      function disablePreviewUi() {
+        previewUi.active = false;
+        previewUi.fullDuration = 0;
+        previewUi.previewSeconds = 0;
+        previewUi.seeking = false;
+        previewControls.classList.remove('on');
+        previewLockTip.classList.remove('on');
+        video.setAttribute('controls', '');
+        previewPlayBtn.textContent = '▶';
+        previewTimeLabel.textContent = '0:00 / 0:00';
+        previewSeekPlayed.style.width = '0%';
+        previewSeekThumb.style.left = '0%';
+        previewSeekPlayable.style.width = '0%';
+      }
+
+      function enablePreviewUi(fullDuration, previewSeconds) {
+        const playable = Math.max(0, Number(previewSeconds) || 0);
+        let total = Number(fullDuration) || 0;
+        if (!(total > 0)) {
+          total = playable > 0 ? playable : 1;
+        }
+        if (playable > 0 && total < playable) {
+          total = playable;
+        }
+        previewUi.active = true;
+        previewUi.fullDuration = total;
+        previewUi.previewSeconds = playable > 0 ? playable : total;
+        previewUi.seeking = false;
+        video.removeAttribute('controls');
+        previewControls.classList.add('on');
+        previewLockTip.classList.remove('on');
+        const playablePct = Math.min(100, (previewUi.previewSeconds / previewUi.fullDuration) * 100);
+        previewSeekPlayable.style.width = playablePct + '%';
+        previewSeek.setAttribute('aria-valuemax', String(Math.floor(previewUi.fullDuration)));
+        syncPreviewUi();
+      }
+
+      function syncPreviewUi() {
+        if (!previewUi.active) return;
+        const total = previewUi.fullDuration || 1;
+        const t = Math.min(video.currentTime || 0, previewUi.previewSeconds);
+        const pct = Math.min(100, Math.max(0, (t / total) * 100));
+        previewSeekPlayed.style.width = pct + '%';
+        previewSeekThumb.style.left = pct + '%';
+        previewTimeLabel.textContent = formatClock(t) + ' / ' + formatClock(total);
+        previewPlayBtn.textContent = video.paused ? '▶' : '❚❚';
+        previewSeek.setAttribute('aria-valuenow', String(Math.floor(t)));
+      }
+
+      function clampPreviewTime(t) {
+        const max = previewUi.previewSeconds;
+        if (!Number.isFinite(t) || t < 0) return 0;
+        if (t > max) return max;
+        return t;
+      }
+
+      function seekPreviewByClientX(clientX) {
+        if (!previewUi.active || !(previewUi.fullDuration > 0)) return;
+        const rect = previewSeek.getBoundingClientRect();
+        const ratio = rect.width > 0 ? (clientX - rect.left) / rect.width : 0;
+        const target = ratio * previewUi.fullDuration;
+        if (target > previewUi.previewSeconds + 0.05) {
+          previewLockTip.classList.add('on');
+          try { video.currentTime = previewUi.previewSeconds; } catch (_) { /* ignore */ }
+          video.pause();
+          syncPreviewUi();
+          return;
+        }
+        previewLockTip.classList.remove('on');
+        try { video.currentTime = clampPreviewTime(target); } catch (_) { /* ignore */ }
+        syncPreviewUi();
+      }
+
+      function onPreviewTimeUpdate() {
+        if (!previewUi.active || previewUi.seeking) return;
+        if (video.currentTime > previewUi.previewSeconds + 0.15) {
+          try { video.currentTime = previewUi.previewSeconds; } catch (_) { /* ignore */ }
+          video.pause();
+          previewLockTip.classList.add('on');
+        }
+        syncPreviewUi();
+      }
+
+      function onPreviewEnded() {
+        if (!previewUi.active) return;
+        previewLockTip.classList.add('on');
+        syncPreviewUi();
+      }
+
+      previewPlayBtn.addEventListener('click', function () {
+        if (!previewUi.active) return;
+        if (video.paused) {
+          if (video.ended || video.currentTime >= previewUi.previewSeconds - 0.05) {
+            try { video.currentTime = 0; } catch (_) { /* ignore */ }
+            previewLockTip.classList.remove('on');
+          }
+          video.play().catch(function () {});
+        } else {
+          video.pause();
+        }
+        syncPreviewUi();
+      });
+
+      previewSeek.addEventListener('pointerdown', function (e) {
+        if (!previewUi.active) return;
+        previewUi.seeking = true;
+        previewSeek.setPointerCapture(e.pointerId);
+        seekPreviewByClientX(e.clientX);
+      });
+      previewSeek.addEventListener('pointermove', function (e) {
+        if (!previewUi.seeking) return;
+        seekPreviewByClientX(e.clientX);
+      });
+      previewSeek.addEventListener('pointerup', function (e) {
+        if (!previewUi.seeking) return;
+        previewUi.seeking = false;
+        try { previewSeek.releasePointerCapture(e.pointerId); } catch (_) { /* ignore */ }
+        syncPreviewUi();
+      });
+      previewSeek.addEventListener('pointercancel', function () {
+        previewUi.seeking = false;
+      });
+
+      video.addEventListener('timeupdate', onPreviewTimeUpdate);
+      video.addEventListener('ended', onPreviewEnded);
+      video.addEventListener('play', syncPreviewUi);
+      video.addEventListener('pause', syncPreviewUi);
+      video.addEventListener('loadedmetadata', function () {
+        if (!previewUi.active) return;
+        // 若接口未返回整片 duration，至少不低于本地试看清单时长
+        const localDur = video.duration;
+        if (Number.isFinite(localDur) && localDur > 0 && previewUi.fullDuration < localDur) {
+          previewUi.fullDuration = localDur;
+          if (previewUi.previewSeconds < localDur) {
+            // keep previewSeconds as business limit
+          }
+          const playablePct = Math.min(100, (previewUi.previewSeconds / previewUi.fullDuration) * 100);
+          previewSeekPlayable.style.width = playablePct + '%';
+        }
+        syncPreviewUi();
+      });
+
+      function hideAbrPanel() {
+        abrPanel.classList.remove('on');
+        abrMeta.textContent = '';
+        abrLevels.innerHTML = '';
+        qualitySelect.innerHTML = '<option value="auto">Auto（自适应）</option>';
+        qualitySelect.disabled = true;
+        qualityState = null;
+      }
+
+      function parsePreviewSecondsForCommit() {
+        const raw = previewSecondsInput.value;
+        if (raw === '' || raw == null) {
+          return null; // 服务端默认
+        }
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n < 0) {
+          throw new Error('试看秒数须为 >=0 的整数（0=不生成试看）');
+        }
+        return Math.floor(n);
+      }
+
+      function setPlayBusy(on) {
+        playBtn.disabled = on;
+        previewBtn.disabled = on;
+      }
+
+      function formatVariantLabel(v, index) {
+        if (!v) return '档' + index;
+        const h = v.height || 0;
+        const bw = v.bandwidth || v.bitrate
+          ? Math.round((v.bandwidth || v.bitrate) / 1000) + 'kbps'
+          : '';
+        if (h) return h + 'p' + (bw ? ' · ' + bw : '');
+        if (v.label) return v.label + (bw ? ' · ' + bw : '');
+        return 'L' + index + (bw ? ' · ' + bw : '');
+      }
+
+      function markActiveQuality(selected) {
+        const value = selected === -1 || selected === 'auto' ? 'auto' : String(selected);
+        qualitySelect.value = value;
+        abrLevels.querySelectorAll('button').forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-level') === value);
+        });
+      }
+
+      function applyQuality(selected) {
+        if (!qualityState) return;
+        if (qualityState.mode === 'hls') {
+          if (!hls) return;
+          if (selected === 'auto' || selected === -1) {
+            hls.currentLevel = -1;
+            markActiveQuality('auto');
+            abrMeta.textContent = '已选 Auto：播放器按带宽自动升降档';
+            return;
+          }
+          const index = Number(selected);
+          hls.currentLevel = index;
+          markActiveQuality(index);
+          abrMeta.textContent = '已锁定：' + formatVariantLabel(hls.levels[index], index);
+          return;
+        }
+        // native HLS：Auto 播 master；手动切档则直接播对应子清单
+        const t = video.currentTime || 0;
+        const wasPaused = video.paused;
+        let nextUrl = qualityState.masterUrl;
+        let meta = '已选 Auto：原生 HLS 由系统自适应';
+        if (selected !== 'auto' && selected !== -1) {
+          const index = Number(selected);
+          const v = qualityState.variants[index];
+          if (!v) return;
+          nextUrl = v.url;
+          meta = '已锁定：' + formatVariantLabel(v, index) + '（原生切档会短暂重缓冲）';
+        }
+        video.src = nextUrl;
+        const seek = function () {
+          if (t > 0 && isFinite(t)) {
+            try { video.currentTime = t; } catch (_) { /* ignore */ }
+          }
+          if (!wasPaused) video.play().catch(function () {});
+          video.removeEventListener('loadedmetadata', seek);
+        };
+        video.addEventListener('loadedmetadata', seek);
+        video.load();
+        markActiveQuality(selected === -1 ? 'auto' : selected);
+        abrMeta.textContent = meta;
+      }
+
+      function buildQualityUi(variants, metaText, multi) {
+        abrPanel.classList.add('on');
+        abrMeta.textContent = metaText;
+        abrLevels.innerHTML = '';
+        qualitySelect.innerHTML = '';
+        qualitySelect.disabled = !multi;
+
+        const autoOpt = document.createElement('option');
+        autoOpt.value = 'auto';
+        autoOpt.textContent = multi ? 'Auto（自适应）' : '仅一档';
+        qualitySelect.appendChild(autoOpt);
+
+        const autoBtn = document.createElement('button');
+        autoBtn.type = 'button';
+        autoBtn.textContent = 'Auto';
+        autoBtn.setAttribute('data-level', 'auto');
+        autoBtn.disabled = !multi;
+        autoBtn.addEventListener('click', function () { applyQuality('auto'); });
+        abrLevels.appendChild(autoBtn);
+
+        variants.forEach(function (v, index) {
+          const label = formatVariantLabel(v, index);
+          const opt = document.createElement('option');
+          opt.value = String(index);
+          opt.textContent = label;
+          qualitySelect.appendChild(opt);
+
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = label;
+          btn.setAttribute('data-level', String(index));
+          btn.disabled = !multi;
+          btn.addEventListener('click', function () { applyQuality(index); });
+          abrLevels.appendChild(btn);
+        });
+
+        markActiveQuality('auto');
+      }
+
+      function renderHlsQualityControls() {
+        if (!hls || !hls.levels || hls.levels.length === 0) {
+          hideAbrPanel();
+          return;
+        }
+        const levels = hls.levels;
+        const multi = levels.length > 1;
+        const variants = levels.map(function (level, index) {
+          return {
+            label: level.height ? (level.height + 'p') : ('L' + index),
+            height: level.height || 0,
+            bitrate: level.bitrate || 0,
+            url: (level.url && level.url[0]) || ''
+          };
+        });
+        qualityState = { mode: 'hls', masterUrl: '', variants: variants };
+        buildQualityUi(
+          variants,
+          multi
+            ? ('ABR 多码率：共 ' + levels.length + ' 档，可手动锁定或保持 Auto')
+            : '单档播放（非 ABR / 仅一档清单）',
+          multi
+        );
+
+        if (levelSwitchedHandler) {
+          hls.off(Hls.Events.LEVEL_SWITCHED, levelSwitchedHandler);
+        }
+        levelSwitchedHandler = function (_e, data) {
+          if (!hls) return;
+          if (hls.autoLevelEnabled) {
+            abrMeta.textContent = 'ABR Auto → 当前 ' + formatVariantLabel(hls.levels[data.level], data.level);
+            markActiveQuality('auto');
+          } else {
+            markActiveQuality(data.level);
+          }
+        };
+        hls.on(Hls.Events.LEVEL_SWITCHED, levelSwitchedHandler);
+      }
+
+      /**
+       * 解析 master.m3u8，抽出各档相对/绝对 URI（网关已改写签名 query）。
+       */
+      function parseMasterVariants(text, masterUrl) {
+        const lines = text.split(/\r?\n/);
+        const variants = [];
+        let pending = null;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line) continue;
+          if (line.indexOf('#EXT-X-STREAM-INF:') === 0) {
+            const bw = /BANDWIDTH=(\d+)/i.exec(line);
+            const res = /RESOLUTION=(\d+)x(\d+)/i.exec(line);
+            pending = {
+              bandwidth: bw ? Number(bw[1]) : 0,
+              height: res ? Number(res[2]) : 0,
+              label: res ? (res[2] + 'p') : ''
+            };
+            continue;
+          }
+          if (line.charAt(0) === '#') continue;
+          if (pending) {
+            try {
+              pending.url = new URL(line, masterUrl).href;
+            } catch (_) {
+              pending.url = line;
+            }
+            if (!pending.label) pending.label = 'L' + variants.length;
+            variants.push(pending);
+            pending = null;
+          }
+        }
+        return variants;
+      }
+
+      async function renderNativeQualityControls(masterUrl, isMaster) {
+        abrPanel.classList.add('on');
+        if (!isMaster) {
+          qualityState = { mode: 'native', masterUrl: masterUrl, variants: [] };
+          buildQualityUi([], '原生 HLS：单档清单', false);
+          return;
+        }
+        try {
+          const res = await fetch(masterUrl, { headers: { Accept: 'application/vnd.apple.mpegurl,*/*' } });
+          if (!res.ok) throw new Error('拉取 master 失败 HTTP ' + res.status);
+          const text = await res.text();
+          const variants = parseMasterVariants(text, masterUrl);
+          qualityState = { mode: 'native', masterUrl: masterUrl, variants: variants };
+          const multi = variants.length > 1;
+          buildQualityUi(
+            variants,
+            multi
+              ? ('原生 HLS：共 ' + variants.length + ' 档，可手动锁定（切档会短暂重缓冲）')
+              : '原生 HLS：master 仅一档',
+            multi
+          );
+        } catch (e) {
+          qualityState = { mode: 'native', masterUrl: masterUrl, variants: [] };
+          buildQualityUi([], '原生 HLS：未能解析档位（仍可 Auto 播放）—' + (e.message || e), false);
+        }
+      }
+
+      qualitySelect.addEventListener('change', function () {
+        applyQuality(qualitySelect.value);
+      });
+
+      async function readJson(res) {
+        const text = await res.text();
+        let data = null;
+        try { data = text ? JSON.parse(text) : null; } catch (_) { /* not json */ }
+        if (!res.ok) {
+          const msg = (data && (data.message || data.error || data.statusText)) || text || ('HTTP ' + res.status);
+          throw new Error(msg);
+        }
+        return data;
+      }
+
+      function putWithProgress(url, body, onProgress) {
+        return new Promise(function (resolve, reject) {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', url);
+          // 预签名未绑定 Content-Type 时不要带该头，否则 MinIO 验签失败
+          xhr.upload.onprogress = function (e) {
+            if (e.lengthComputable && onProgress) {
+              onProgress(e.loaded, e.total);
+            }
+          };
+          xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(xhr.getResponseHeader('ETag') || '');
+            } else {
+              reject(new Error('MinIO PUT 失败: HTTP ' + xhr.status + ' ' + (xhr.responseText || '')));
+            }
+          };
+          xhr.onerror = function () {
+            reject(new Error('MinIO PUT 网络错误（请确认 MinIO CORS 允许本页来源，且 9000 可访问）'));
+          };
+          xhr.send(body);
+        });
+      }
+
+      function setUploading(on) {
+        uploadFullBtn.disabled = on;
+        uploadProgBtn.disabled = on;
+      }
+
+      async function fetchMedia(fileId) {
+        return readJson(await fetch(API_BASE + '/medias/' + encodeURIComponent(fileId), {
+          headers: { Accept: 'application/json' }
+        }));
+      }
+
+      function stopPoll() {
+        if (pollTimer) {
+          clearInterval(pollTimer);
+          pollTimer = null;
+        }
+      }
+
+      function startPoll(fileId, progressive) {
+        stopPoll();
+        pollTimer = setInterval(async function () {
+          try {
+            const m = await fetchMedia(fileId);
+            const label = m.statusText || m.status || '';
+            const st = m.status;
+            if (st === 'PLAYABLE' || st === 3) {
+              setUploadMsg('已可播（低清就绪），可点「申请播放」；高清补档中… fileId=' + fileId, 'ok');
+              return;
+            }
+            if (st === 'FINISHED' || st === 4) {
+              stopPoll();
+              setUploadMsg((progressive ? '档位齐全，' : '转码完成，') + '可点击「申请播放」。fileId=' + fileId, 'ok');
+              return;
+            }
+            if (st === 'FAILED' || String(st).indexOf('FAIL') >= 0) {
+              stopPoll();
+              setUploadMsg('转码失败: ' + (m.errorMsg || label), 'err');
+              return;
+            }
+            setUploadMsg('转码中… fileId=' + fileId + '  状态=' + label, 'info');
+          } catch (e) {
+            /* 轮询偶发失败忽略，下次再试 */
+          }
+        }, 3000);
+      }
+
+      function selectedFile() {
+        const file = fileInput.files && fileInput.files[0];
+        errEl.textContent = '';
+        if (!file) {
+          setUploadMsg('请先选择视频文件', 'err');
+          return null;
+        }
+        if (!file.size) {
+          setUploadMsg('文件为空，无法上传', 'err');
+          return null;
+        }
+        return file;
+      }
+
+      function beginUpload() {
+        setUploading(true);
+        uploadBarWrap.classList.add('on');
+        uploadBar.style.width = '0%';
+        stopPoll();
+      }
+
+      async function commitAndWatch(fileId, filename, progressive) {
+        let previewSeconds;
+        try {
+          previewSeconds = parsePreviewSecondsForCommit();
+        } catch (e) {
+          setUploadMsg(e.message || String(e), 'err');
+          throw e;
+        }
+        setUploadMsg('确认上传（commit，progressive=' + progressive +
+          ', previewSeconds=' + (previewSeconds == null ? 'default' : previewSeconds) + '）…', 'info');
+        const body = { fileId: fileId, filename: filename, progressive: progressive };
+        if (previewSeconds != null) {
+          body.previewSeconds = previewSeconds;
+        }
+        const media = await readJson(await fetch(API_BASE + '/medias', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify(body)
+        }));
+        const label = media.statusText || media.status || '';
+        const tip = progressive
+          ? '已提交渐进式任务。低清就绪后即可播放，高清后台补档。'
+          : '已提交一次出齐任务。全部档转完后即可播放。';
+        const ps = media.previewSeconds != null ? (' 试看=' + media.previewSeconds + 's') : '';
+        setUploadMsg(tip + ' fileId=' + fileId + '  状态=' + label + ps, 'ok');
+        if (media.status !== 'FINISHED' && media.status !== 4) {
+          startPoll(fileId, progressive);
+        }
+      }
+
+      async function uploadWholeFile(progressive) {
+        const file = selectedFile();
+        if (!file) return;
+        beginUpload();
+        fileIdEl.value = '';
+        try {
+          setUploadMsg((progressive ? '渐进式' : '一次出齐') + '：申请上传凭证…', 'info');
+          const sig = await readJson(await fetch(API_BASE + '/signature/upload', {
+            headers: { Accept: 'application/json' }
+          }));
+          if (!sig.uploadUrl || !sig.fileId) {
+            throw new Error('凭证响应缺少 uploadUrl / fileId');
+          }
+          fileIdEl.value = sig.fileId;
+          setUploadMsg('直传 MinIO… fileId=' + sig.fileId, 'info');
+          await putWithProgress(sig.uploadUrl, file, function (loaded, total) {
+            uploadBar.style.width = Math.round(loaded / total * 100) + '%';
+          });
+          uploadBar.style.width = '100%';
+          await commitAndWatch(sig.fileId, file.name, progressive);
+        } catch (e) {
+          setUploadMsg(e.message || String(e), 'err');
+        } finally {
+          setUploading(false);
+        }
+      }
+
+      uploadFullBtn.addEventListener('click', function () {
+        uploadWholeFile(false);
+      });
+      uploadProgBtn.addEventListener('click', function () {
+        uploadWholeFile(true);
+      });
+
+      function destroyHls() {
+        if (hls) {
+          if (levelSwitchedHandler) {
+            try { hls.off(Hls.Events.LEVEL_SWITCHED, levelSwitchedHandler); } catch (_) { /* ignore */ }
+            levelSwitchedHandler = null;
+          }
+          hls.destroy();
+          hls = null;
+        }
+        hideAbrPanel();
+        hidePreviewBadge();
+        disablePreviewUi();
+        video.removeAttribute('src');
+        video.load();
+      }
+
+      function toPlayableUrl(playUrl) {
+        try {
+          const u = new URL(playUrl, window.location.origin);
+          if (u.pathname.startsWith('/hls/')) {
+            return window.location.origin + u.pathname + u.search;
+          }
+        } catch (_) { /* keep original */ }
+        return playUrl;
+      }
+
+      function playlistKindLabel(src) {
+        if (/\/preview\.m3u8(\?|$)/i.test(src)) return '[试看 preview] ';
+        if (/\/master\.m3u8(\?|$)/i.test(src)) return '[ABR master] ';
+        return '[单档 index] ';
+      }
+
+      async function attachSource(playUrl, isPreview, previewSeconds, fullDuration) {
+        destroyHls();
+        const src = toPlayableUrl(playUrl);
+        const isMaster = /\/master\.m3u8(\?|$)/i.test(src);
+        const isPreviewPath = /\/preview\.m3u8(\?|$)/i.test(src);
+        urlEl.textContent = playlistKindLabel(src) + 'playUrl: ' + src;
+        if (isPreview) {
+          enablePreviewUi(fullDuration || 0, previewSeconds || 0);
+          showPreviewBadge(previewSeconds || 0, previewUi.fullDuration);
+          if (!isPreviewPath) {
+            previewBadge.textContent += '；当前 path 非 preview（L2 未开或无产物）';
+          }
+        } else {
+          disablePreviewUi();
+        }
+
+        // 优先 hls.js，才能用 currentLevel 做无缝手动选档
+        if (window.Hls && Hls.isSupported()) {
+          hls = new Hls({ enableWorker: true, startLevel: -1 });
+          hls.loadSource(src);
+          hls.attachMedia(video);
+          hls.on(Hls.Events.MANIFEST_PARSED, function () {
+            renderHlsQualityControls();
+            if (isPreview) syncPreviewUi();
+          });
+          hls.on(Hls.Events.ERROR, function (_e, data) {
+            if (data.fatal) {
+              errEl.textContent = '播放失败: ' + (data.type || '') + ' / ' + (data.details || 'fatal');
+            }
+          });
+          video.play().catch(function () {});
+          return;
+        }
+
+        if (video.canPlayType('application/vnd.apple.mpegurl')) {
+          video.src = src;
+          video.play().catch(function () {});
+          await renderNativeQualityControls(src, isMaster);
+          if (isPreview) syncPreviewUi();
+          return;
+        }
+
+        throw new Error('当前浏览器不支持 HLS');
+      }
+
+      async function requestPlay(preview) {
+        const fileId = fileIdEl.value.trim();
+        errEl.textContent = '';
+        errEl.className = 'msg err';
+        urlEl.textContent = '';
+        hideAbrPanel();
+        hidePreviewBadge();
+        disablePreviewUi();
+        if (!fileId) {
+          errEl.textContent = '请输入 fileId';
+          return;
+        }
+        setPlayBusy(true);
+        try {
+          let url = API_BASE + '/signature/play?fileId=' + encodeURIComponent(fileId);
+          if (preview) {
+            url += '&preview=true';
+          }
+          const data = await readJson(await fetch(url, { headers: { Accept: 'application/json' } }));
+          if (!data || !data.playUrl) {
+            throw new Error('响应缺少 playUrl');
+          }
+          let previewSeconds = 0;
+          let fullDuration = 0;
+          if (preview) {
+            try {
+              const m = await fetchMedia(fileId);
+              previewSeconds = m.previewSeconds || 0;
+              fullDuration = m.duration || 0;
+            } catch (_) { /* ignore */ }
+          }
+          await attachSource(data.playUrl, preview, previewSeconds, fullDuration);
+        } catch (e) {
+          destroyHls();
+          errEl.textContent = e.message || String(e);
+        } finally {
+          setPlayBusy(false);
+        }
+      }
+
+      playBtn.addEventListener('click', function () {
+        requestPlay(false);
+      });
+
+      previewBtn.addEventListener('click', function () {
+        requestPlay(true);
+      });
+
+      refreshBtn.addEventListener('click', async function () {
+        const fileId = fileIdEl.value.trim();
+        errEl.textContent = '';
+        if (!fileId) {
+          errEl.textContent = '请输入 fileId';
+          return;
+        }
+        try {
+          const m = await fetchMedia(fileId);
+          const mediaUrl = m.mediaUrl || '';
+          const abrHint = /master\.m3u8$/i.test(mediaUrl)
+            ? '（ABR：media_url=master.m3u8）'
+            : (mediaUrl ? '（单档：' + mediaUrl + '）' : '');
+          const ps = m.previewSeconds != null ? (' 试看秒数=' + m.previewSeconds) : '';
+          errEl.className = 'msg ok';
+          errEl.textContent = '状态=' + (m.statusText || m.status) + abrHint + ps +
+            (m.errorMsg ? ('  ' + m.errorMsg) : '');
+        } catch (e) {
+          errEl.className = 'msg err';
+          errEl.textContent = e.message || String(e);
+        }
+      });
+
+      fileIdEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') playBtn.click();
+      });
+    })();
+  </script>
+</body>
+</html>

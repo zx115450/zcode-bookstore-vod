@@ -1,0 +1,70 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: vod-api
+  datasource:
+    url: jdbc:mysql://${MYSQL_HOST:192.168.150.104}:${MYSQL_PORT:3306}/${MYSQL_DATABASE:lite_vod}?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${MYSQL_USER:root}
+    password: ${MYSQL_PASSWORD:1234}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+  rabbitmq:
+    host: ${RABBITMQ_HOST:192.168.150.104}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:root}
+    password: ${RABBITMQ_PASSWORD:1234}
+
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://192.168.150.104:9000}
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:http://192.168.150.104:9000}
+  access-key: ${MINIO_ROOT_USER:root}
+  secret-key: ${MINIO_ROOT_PASSWORD:root1234}
+  bucket: ${MINIO_BUCKET:vod}
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true
+  type-handlers-package: com.example.vod.common.domain.media
+
+# 播放签名（步骤 10/11）：密钥仅环境变量。IDE 本地默认走 Filter；Compose 覆盖为 Nginx 网关
+play-sign:
+  secret: ${VOD_PLAY_SECRET:dev-play-secret-change-me}
+  public-base: ${VOD_PLAY_PUBLIC_BASE:http://localhost:8080}
+  ttl-seconds: ${VOD_PLAY_TTL_SECONDS:3600}
+  gateway-filter-enabled: ${VOD_PLAY_GATEWAY_FILTER_ENABLED:true}
+
+# 上传配置（二期）：multipart-enabled 由配置绑定，关闭时接口返回 501
+vod:
+  # L4：书城 BFF 调 /internal/medias/** 时须带 X-Internal-Token（与 BOOKSTORE_MEDIA_TOKEN 同值）
+  internal:
+    token: ${VOD_INTERNAL_TOKEN:dev-internal-token-change-me}
+    enabled: ${VOD_INTERNAL_ENABLED:true}
+  upload:
+    multipart-enabled: ${VOD_UPLOAD_MULTIPART_ENABLED:true}
+    min-part-size: ${VOD_UPLOAD_MIN_PART_SIZE:5242880}      # 5 MiB
+    max-part-size: ${VOD_UPLOAD_MAX_PART_SIZE:67108864}      # 64 MiB
+    default-part-size: ${VOD_UPLOAD_DEFAULT_PART_SIZE:10485760} # 10 MiB
+  # commit 是否投递 FAST（渐进式）看 progressive-enabled；实际转档仍在 Worker。
+  abr:
+    enabled: ${VOD_ABR_ENABLED:true}
+    progressive-enabled: ${VOD_ABR_PROGRESSIVE_ENABLED:false}
+    fast-variant: ${VOD_ABR_FAST_VARIANT:360p}
+    fast-preset: ${VOD_ABR_FAST_PRESET:veryfast}
+    ladder-preset: ${VOD_ABR_LADDER_PRESET:medium}
+  # 试看 L2：上传方 commit 传 previewSeconds；播放 preview=true 时签发 preview.m3u8。
+  preview:
+    l2-enabled: ${VOD_PREVIEW_L2_ENABLED:false}
+    seconds: ${VOD_PREVIEW_SECONDS:30}
+    max-seconds: ${VOD_PREVIEW_MAX_SECONDS:1800}
+  # 播放清单以 media.media_url 为准（master.m3u8 或 index.m3u8）。
+
+logging:
+  level:
+    com.example.vod: info
+    org.springframework.jdbc: warn
+    com.example.vod.common.domain.media: debug

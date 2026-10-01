@@ -1,0 +1,281 @@
+server:
+  port: 8081
+spring:
+  profiles:
+    active: local
+  application:
+    name: smart_bookstore
+  # 默认排除 Milvus 自动装配，避免仅引入 starter 就强连；真正启用由 ai.rag.enabled=true
+  # 时 AiVectorConfig @Import（显式导入不受本 exclude 影响）。当前默认 ai.rag.enabled=true。
+  autoconfigure:
+    exclude:
+      - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
+  # 敏感配置：激活 local profile → application-local.yaml（已 gitignore）
+  sql:
+    init:
+      # 表结构改由 Flyway 管理，禁止与 sql.init 双通道
+      mode: never
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    encoding: UTF-8
+    # 空库：正常执行 V1；已有库且无历史表：记 baseline=1，跳过 V1 内容
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: existing_schema
+    validate-on-migrate: true
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    # 敏感：在 application-local.yaml 或环境变量中覆盖
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    protocol: smtp
+    ssl:
+      enabled: true
+    properties:
+      mail:
+        smtp:
+          auth: true
+          ssl:
+            enable: true
+            trust: ${MAIL_SSL_TRUST:smtp.qq.com}
+          from: ${spring.mail.username}
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+  datasource:
+    # 敏感：url / username / password 在 application-local.yaml 覆盖
+    url: ${DB_URL:}
+    username: ${DB_USERNAME:}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: SmartBookstoreHikariCP
+      minimum-idle: 5
+      maximum-pool-size: 20
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      validation-timeout: 5000
+      keepalive-time: 300000
+  output:
+    ansi:
+      enabled: always
+  data:
+    # 兼容占位：真实拓扑由 bookstore.redis.mode 驱动（见下方 bookstore.redis）
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    # 敏感：账号密码在 application-local.yaml 覆盖
+    username: ${RABBITMQ_USERNAME:}
+    password: ${RABBITMQ_PASSWORD:}
+    virtual-host: ${RABBITMQ_VHOST:/}
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: 10
+  ai:
+    # 均走 OpenAI 兼容协议：chat=DeepSeek，embedding=千问(DashScope)
+    model:
+      chat: openai
+      embedding: openai
+    openai:
+      chat:
+        # 敏感：DEEPSEEK_API_KEY 或 application-local.yaml
+        api-key: ${DEEPSEEK_API_KEY:${AI_API_KEY:}}
+        base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+        options:
+          model: ${ai.chat-model}
+          temperature: ${ai.temperature}
+      embedding:
+        # 敏感：DASHSCOPE_API_KEY 或 application-local.yaml
+        api-key: ${DASHSCOPE_API_KEY:${AI_EMBEDDING_API_KEY:}}
+        # Spring AI 会自动拼接 /v1 → .../compatible-mode/v1
+        base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com/compatible-mode}
+        options:
+          model: ${ai.embedding-model}
+          dimensions: ${ai.embedding-dimension}
+    vectorstore:
+      milvus:
+        client:
+          host: ${MILVUS_HOST:localhost}
+          port: ${MILVUS_PORT:19530}
+        database-name: default
+        collection-name: bookstore_book
+        # 须与千问 text-embedding-v3 输出维度一致（默认 1024）
+        embedding-dimension: ${ai.embedding-dimension}
+        # Spring AI 2.0 + Milvus 2.6：initialize-schema 会用空 indexName 调 describeIndex，
+        # 即使已有 embedding 索引也会报 index not found 并可能导致启动失败。集合需已建好并建索引。
+        initialize-schema: false
+        index-type: IVF_FLAT
+        metric-type: COSINE
+
+# AI 业务侧配置（会话 / 限流 / 模型名）
+ai:
+  enabled: true
+  chat-model: deepseek-chat
+  embedding-model: text-embedding-v3
+  embedding-dimension: 1024
+  temperature: 0.3
+  max-history-turns: 6
+  rate-limit:
+    per-user-hourly: 30
+  session:
+    ttl-minutes: 30
+  # RAG + Milvus 向量检索：默认开启（需 VM 内 Milvus gRPC 正常，host/port 见 spring.ai.vectorstore.milvus）。
+  rag:
+    enabled: true
+    # 语义召回参数
+    top-k: 8
+    similarity-threshold: 0.6
+    # 启动时是否全量预热索引（默认关闭，量大时耗时）
+    prewarm-on-startup: false
+
+# 持久层：MyBatis-Plus（不使用 JPA / Hibernate）
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: auto
+
+
+auth:
+  jwt:
+    # 敏感：必须在 application-local.yaml 或 JWT_SECRET 中提供（≥256 bit 随机串）
+    secret: ${JWT_SECRET:}
+    access-expire-seconds: 7200
+    refresh-expire-days: 7
+    refresh-expire-days-remember: 30
+    session-absolute-expire-days: 90
+    issuer: smart_bookstore
+  rate-limit:
+    send-code-per-target-seconds: 60
+    send-code-per-target-hourly: 5
+    send-code-per-ip-hourly: 10
+    login-fail-max: 5
+    login-fail-lock-minutes: 15
+  verification-code-ttl-seconds: 300
+  session-cache:
+    enabled: true
+  oauth:
+    qq:
+      app-id: ${QQ_APP_ID:}
+      app-key: ${QQ_APP_KEY:}
+      redirect-uri: ${QQ_REDIRECT_URI:http://localhost:8081/api/auth/oauth/qq/callback}
+      frontend-success-url: ${QQ_FRONTEND_SUCCESS_URL:http://localhost:5173/oauth/qq/success}
+      frontend-error-url: ${QQ_FRONTEND_ERROR_URL:http://localhost:5173/oauth/qq/error}
+      state-ttl-seconds: 600
+
+bookstore:
+  # Redis 拓扑：standalone | master-replica | sentinel | cluster（环境变量 REDIS_MODE）
+  redis:
+    mode: ${REDIS_MODE:standalone}
+    password: ${REDIS_PASSWORD:}
+    database: 0
+    # 主从/哨兵/集群读策略：MASTER / MASTER_PREFERRED / REPLICA_PREFERRED / REPLICA / ANY
+    read-from: ${REDIS_READ_FROM:REPLICA_PREFERRED}
+    standalone:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+    master-replica:
+      master-host: ${REDIS_MASTER_HOST:localhost}
+      master-port: ${REDIS_MASTER_PORT:6379}
+      # 从节点，YAML 列表或单项内逗号分隔，如 localhost:6380,localhost:6381
+      nodes: []
+    sentinel:
+      master: ${REDIS_SENTINEL_MASTER:mymaster}
+      # Sentinel 地址列表，如 host:26379
+      nodes: []
+      password: ${REDIS_SENTINEL_PASSWORD:}
+    cluster:
+      # 种子节点（至少一个）；客户端会自动发现其余节点。Cluster 不支持 SELECT，database 须为 0
+      nodes: []
+      max-redirects: 5
+  cache:
+    enabled: true
+    # L1 Caffeine（本机堆）；关闭后仅 Redis L2
+    local-enabled: true
+    local-max-size: 2000
+    local-expire-seconds: 60
+    # 热点探测：分桶滑动窗口，命中后 Redis 用长 TTL
+    hot-key-enabled: true
+    hot-window-seconds: 60
+    hot-bucket-seconds: 10
+    hot-threshold: 50
+    hot-detail-ttl-seconds: 7200
+    hot-detail-ttl-jitter-seconds: 600
+    hot-max-tracked-keys: 5000
+    detail-ttl-seconds: 1800
+    detail-ttl-jitter-seconds: 300
+    bloom-enabled: true
+    bloom-expected-elements: 100000
+    bloom-false-positive-rate: 0.01
+    bloom-warmup-on-startup: true
+  borrow:
+    overdue:
+      enabled: true
+      poll-interval-ms: 60000
+      batch-size: 100
+  trade:
+    unpaid-cancel-delay-minutes: 15
+    # unpaid-cancel-delay-ms: 60000  # 联调时可改为 1 分钟
+  # MQ 消费重试：默认 queue（Broker TTL 等待队列，不占消费线程）；可选 local（线程内 RetryTemplate）
+  # max-attempts 含首次；业务异常 / IllegalArgumentException 不进 retry，直接 DLQ
+  mq:
+    retry:
+      enabled: true
+      strategy: queue
+      max-attempts: 3
+      initial-interval-ms: 1000
+      multiplier: 2.0
+      max-interval-ms: 10000
+  seckill:
+    rate-limit:
+      enabled: true
+      # 活动维度：容量即短时突发上限，每秒补充速率
+      activity-capacity: 2000
+      activity-refill-per-second: 2000
+      # 用户维度：防单用户狂点
+      user-capacity: 2
+      user-refill-per-second: 1
+      key-ttl-seconds: 7200
+
+checkin:
+  frontend-base-url: ${CHECKIN_FRONTEND_URL:http://localhost:5173}
+  streak-reward-days: 7
+  window-minutes-before: 15
+  window-minutes-after: 15
+
+logging:
+  level:
+    com:
+      zx:
+        auth:
+          mapper: debug
+          service: info
+          controller: info
+        bookstore:
+          service: info
+
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  observations:
+    key-values:
+      region: local

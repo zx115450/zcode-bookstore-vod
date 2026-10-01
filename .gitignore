@@ -1,0 +1,31 @@
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Build
+**/target/
+*.class
+*.log
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Secrets / local
+.env
+**/.env
+**/application-local.yaml
+**/nginx.pid
+**/logs/
+
+# Docs (never upload stepwise docs)
+docs/
+**/docs/
+
+# Misc
+tools/
+**/tools/
+
+**/cp.txt

@@ -1,0 +1,18 @@
+# Maven
+vod-api/target/
+vod-worker/target/
+!**/target/*.jar
+*.log
+*.class
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 演示机密钥与 IMAGE_TAG（用 .env.example 作模板）
+.env
