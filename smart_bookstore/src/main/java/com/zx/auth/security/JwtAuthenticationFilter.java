@@ -35,7 +35,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/api/auth/code/send",
             "/api/auth/logout",
             "/api/auth/oauth/qq/state",
-            "/api/auth/oauth/qq/callback"
+            "/api/auth/oauth/qq/callback",
+            "/api/internal/media/callback"
     );
 
     /**

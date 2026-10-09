@@ -25,6 +25,21 @@ public class BorrowOrderRepository {
         return Optional.ofNullable(mapper.selectById(id));
     }
 
+    /**
+     * 尚未确认借出的申请单。确认借出时已扣 {@code borrowStock}，不能再算进可借占用。
+     */
+    public long countAppliedByBookId(Long bookId) {
+        if (bookId == null) {
+            return 0;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.APPLIED.name())
+        );
+        return count == null ? 0 : count;
+    }
+
     public long countOccupiedByBookId(Long bookId) {
         Long count = mapper.selectCount(
                 Wrappers.<BorrowOrder>lambdaQuery()
@@ -37,6 +52,18 @@ public class BorrowOrderRepository {
         return count == null ? 0 : count;
     }
 
+    public boolean hasPendingApplyByUser(Long userId) {
+        if (userId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.APPLIED.name())
+        );
+        return count != null && count > 0;
+    }
+
     public boolean hasActiveBorrowByUser(Long userId) {
         Long count = mapper.selectCount(
                 Wrappers.<BorrowOrder>lambdaQuery()
@@ -44,6 +71,43 @@ public class BorrowOrderRepository {
                         .in(BorrowOrder::getStatus,
                                 BorrowOrderStatus.BORROWED.name(),
                                 BorrowOrderStatus.OVERDUE.name())
+        );
+        return count != null && count > 0;
+    }
+
+    /**
+     * 用户对该书是否处于借阅中或逾期未还（占额度 / 待还统计用）。
+     * <p>
+     * 线上阅读与完整视频解锁请用 {@link #hasUnlockBorrow(Long, Long)}：逾期应降级试看。
+     */
+    public boolean hasActiveBorrow(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .in(BorrowOrder::getStatus,
+                                BorrowOrderStatus.BORROWED.name(),
+                                BorrowOrderStatus.OVERDUE.name())
+        );
+        return count != null && count > 0;
+    }
+
+    /**
+     * 是否可解锁付费章 / 完整配套视频：仅 {@code BORROWED}。
+     * {@code OVERDUE} 不解锁（归还前降级试看）；已购走交易侧判定。
+     */
+    public boolean hasUnlockBorrow(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        Long count = mapper.selectCount(
+                Wrappers.<BorrowOrder>lambdaQuery()
+                        .eq(BorrowOrder::getUserId, userId)
+                        .eq(BorrowOrder::getBookId, bookId)
+                        .eq(BorrowOrder::getStatus, BorrowOrderStatus.BORROWED.name())
         );
         return count != null && count > 0;
     }
@@ -120,6 +184,10 @@ public class BorrowOrderRepository {
 
     public int updateToOverdue(Long id) {
         return mapper.updateToOverdue(id);
+    }
+
+    public int updateRenew(Long id, LocalDateTime dueAt, int maxRenew) {
+        return mapper.updateRenew(id, dueAt, maxRenew);
     }
 
     public int updateOverdueBatch(int limit) {

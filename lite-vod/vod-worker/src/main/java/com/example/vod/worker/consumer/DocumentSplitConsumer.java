@@ -15,6 +15,8 @@ import com.example.vod.common.messaging.DocumentSplitTaskMessage;
 import com.example.vod.common.messaging.RabbitConfig;
 import com.example.vod.common.storage.MinioStorage;
 import com.example.vod.common.storage.ObjectKeys;
+import com.example.vod.worker.callback.CallbackNotifier;
+import com.example.vod.worker.callback.CallbackPayload;
 import com.example.vod.worker.config.WorkerProperties;
 import com.rabbitmq.client.Channel;
 import lombok.extern.slf4j.Slf4j;
@@ -49,15 +51,18 @@ public class DocumentSplitConsumer {
     private final MediaTaskMapper mediaTaskMapper;
     private final MinioStorage minioStorage;
     private final WorkerProperties props;
+    private final CallbackNotifier callbackNotifier;
 
     public DocumentSplitConsumer(MediaMapper mediaMapper,
                                  MediaTaskMapper mediaTaskMapper,
                                  MinioStorage minioStorage,
-                                 WorkerProperties props) {
+                                 WorkerProperties props,
+                                 CallbackNotifier callbackNotifier) {
         this.mediaMapper = mediaMapper;
         this.mediaTaskMapper = mediaTaskMapper;
         this.minioStorage = minioStorage;
         this.props = props;
+        this.callbackNotifier = callbackNotifier;
     }
 
     @RabbitListener(queues = RabbitConfig.DOCUMENT_SPLIT_QUEUE, concurrency = "1")
@@ -93,6 +98,7 @@ public class DocumentSplitConsumer {
                 cleanupPartial(fileId);
                 mediaMapper.updateFailed(fileId, MediaStatus.FAILED, truncate(msg));
                 mediaTaskMapper.updateFinished(taskId, MediaTaskStatus.FAILED, truncate(msg));
+                callbackNotifier.notifyAsync(CallbackPayload.documentFailed(fileId, truncate(msg)));
                 ack(channel, deliveryTag);
                 return;
             }
@@ -108,18 +114,21 @@ public class DocumentSplitConsumer {
             mediaTaskMapper.updateFinished(taskId, MediaTaskStatus.SUCCESS, null);
             log.info("document split finished fileId={} taskId={} chapters={}",
                     fileId, taskId, pieces.size());
+            callbackNotifier.notifyAsync(CallbackPayload.documentProcessed(fileId));
             ack(channel, deliveryTag);
         } catch (Exception ex) {
             log.error("document split failed fileId={} taskId={}", fileId, taskId, ex);
+            String err = truncate(ex.getMessage());
             try {
                 cleanupPartial(fileId);
-                mediaMapper.updateFailed(fileId, MediaStatus.FAILED, truncate(ex.getMessage()));
+                mediaMapper.updateFailed(fileId, MediaStatus.FAILED, err);
                 if (taskId != null) {
-                    mediaTaskMapper.updateFinished(taskId, MediaTaskStatus.FAILED, truncate(ex.getMessage()));
+                    mediaTaskMapper.updateFinished(taskId, MediaTaskStatus.FAILED, err);
                 }
             } catch (Exception ignore) {
                 // best-effort
             }
+            callbackNotifier.notifyAsync(CallbackPayload.documentFailed(fileId, err));
             ack(channel, deliveryTag);
         } finally {
             cleanupWorkDir(workDir);

@@ -18,6 +18,10 @@ package com.zx.common.exception;
  *   <li>4400~4499 — 购书交易</li>
  *   <li>4500~4599 — 秒杀</li>
  *   <li>5001~5099 — AI 客服</li>
+ *   <li>5101~5199 — 线上阅读</li>
+ *   <li>5201~5299 — 阅读笔记</li>
+ *   <li>5301~5399 — Study Agent</li>
+ *   <li>6001~6099 — 媒资依赖</li>
  *   <li>9999  — 未知系统错误</li>
  * </ul>
  */
@@ -87,6 +91,10 @@ public final class ErrorCode {
     public static final int BORROW_INVALID_STATUS = 4102;
     public static final int BORROW_ORDER_NOT_FOUND = 4103;
     public static final int BORROW_FORBIDDEN = 4104;
+    /** 续借次数已用完 */
+    public static final int BORROW_RENEW_LIMIT = 4105;
+    /** 已有待确认的借阅申请 */
+    public static final int BORROW_HAS_PENDING = 4106;
 
     // 购物车：4200~4299
     public static final int CART_ITEM_NOT_FOUND = 4200;
@@ -128,4 +136,32 @@ public final class ErrorCode {
     public static final int AI_RATE_LIMITED = 5002;
     public static final int AI_SESSION_EXPIRED = 5003;
     public static final int AI_BAD_REQUEST = 5004;
+
+    // 线上阅读：5101~5199
+    /** 电子书不存在或已下架 */
+    public static final int READER_EBOOK_NOT_FOUND = 5101;
+    /** 试看拒绝（未解锁章，禁止调媒资拉正文） */
+    public static final int READER_PREVIEW_DENIED = 5103;
+    /** 电子书未关联实体书，付费章无法按借阅/购买解锁 */
+    public static final int READER_EBOOK_NOT_BOUND = 5104;
+
+    // 阅读笔记：5201~5299
+    public static final int READER_NOTE_FORBIDDEN = 5201;
+    /** 锁定章划线过长（防泄文） */
+    public static final int READER_NOTE_QUOTE_DENIED = 5202;
+
+    // Study Agent：5301~5399
+    public static final int READER_AGENT_RATE_LIMITED = 5301;
+
+    // 媒资依赖：6001~6099
+    /** 图书媒资绑定不存在 */
+    public static final int MEDIA_REF_NOT_FOUND = 6001;
+    /** 媒资不可用（超时 / 5xx / Token 失败 / 未启用） */
+    public static final int MEDIA_UNAVAILABLE = 6002;
+    /** 章对象不存在或未切完；或 VIDEO fileId 不存在 / 未转码完成 */
+    public static final int MEDIA_CHAPTER_NOT_READY = 6003;
+    /** 无完整播放权限且不允许试看（preview_seconds=0） */
+    public static final int MEDIA_PLAY_DENIED = 6004;
+    /** 播放签名申请失败 */
+    public static final int MEDIA_PLAY_SIGN_FAILED = 6005;
 }

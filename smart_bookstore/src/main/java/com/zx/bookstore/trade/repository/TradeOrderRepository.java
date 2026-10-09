@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,6 +63,15 @@ public class TradeOrderRepository {
     public List<TradeOrderItem> findItemsByOrderId(Long orderId) {
         return itemMapper.selectList(
                 Wrappers.<TradeOrderItem>lambdaQuery().eq(TradeOrderItem::getOrderId, orderId)
+        );
+    }
+
+    public List<TradeOrderItem> findItemsByOrderIds(Collection<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            return List.of();
+        }
+        return itemMapper.selectList(
+                Wrappers.<TradeOrderItem>lambdaQuery().in(TradeOrderItem::getOrderId, orderIds)
         );
     }
 
@@ -124,6 +134,14 @@ public class TradeOrderRepository {
     public List<Map<String, Object>> findHotPaidBooks(int limit) {
         int safe = Math.min(Math.max(limit, 1), 200);
         return itemMapper.findHotPaidBooks(safe);
+    }
+
+    /** 用户是否已购该书（存在 PAID 订单含该 book_id）。 */
+    public boolean hasPaidBook(Long userId, Long bookId) {
+        if (userId == null || bookId == null) {
+            return false;
+        }
+        return itemMapper.countPaidByUserAndBook(userId, bookId) > 0;
     }
 
     public List<Map<String, Object>> revenueTrend(LocalDateTime start) {

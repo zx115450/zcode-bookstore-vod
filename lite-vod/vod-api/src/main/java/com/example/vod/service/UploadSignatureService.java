@@ -55,7 +55,7 @@ public class UploadSignatureService {
      * @param assetType 资产类型；缺省 VIDEO；CHAPTER 不可经上传创建
      */
     @Transactional
-    public UploadSignatureResponse create(AssetType assetType) {
+    public UploadSignatureResponse  create(AssetType assetType) {
         AssetType type = assetType != null ? assetType : AssetType.VIDEO;
         if (!type.uploadable()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
@@ -104,21 +104,33 @@ public class UploadSignatureService {
                     "partCount exceeds 10000: " + partCount + ", increase partSize");
         }
 
+        AssetType type;
+        try {
+            type = AssetType.fromParam(request.assetType());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "unsupported assetType: " + request.assetType());
+        }
+        if (!type.uploadable()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "assetType " + type + " cannot be created via upload; CHAPTER is produced by split worker");
+        }
+
         String fileId = IdGenerator.fileId();
-        AssetType type = AssetType.VIDEO;
         String objectKey = ObjectKeys.raw(fileId, type.defaultExtension());
+        String contentType = request.contentType() != null && !request.contentType().isBlank()
+                ? request.contentType()
+                : type.defaultMimeType();
 
         Media media = new Media();
         media.setFileId(fileId);
         media.setAssetType(type);
-        media.setMimeType(request.contentType() != null && !request.contentType().isBlank()
-                ? request.contentType()
-                : type.defaultMimeType());
+        media.setMimeType(contentType);
         media.setObjectKey(objectKey);
         media.setStatus(MediaStatus.UPLOADING);
         mediaMapper.insert(media);
 
-        String uploadId = minioStorage.createMultipartUpload(objectKey, request.contentType());
+        String uploadId = minioStorage.createMultipartUpload(objectKey, contentType);
 
         long expireAt = Instant.now().plus(DEFAULT_EXPIRY).getEpochSecond();
         List<PartUrl> parts = new ArrayList<>(partCount);

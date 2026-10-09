@@ -10,6 +10,8 @@ import com.example.vod.common.domain.media.SplitRule;
 import com.example.vod.common.messaging.DocumentSplitTaskMessage;
 import com.example.vod.common.storage.MinioStorage;
 import com.example.vod.common.storage.ObjectKeys;
+import com.example.vod.worker.callback.CallbackNotifier;
+import com.example.vod.worker.callback.CallbackPayload;
 import com.example.vod.worker.config.WorkerProperties;
 import com.rabbitmq.client.Channel;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +44,7 @@ class DocumentSplitConsumerTest {
     private MediaMapper mediaMapper;
     private MediaTaskMapper mediaTaskMapper;
     private MinioStorage minioStorage;
+    private CallbackNotifier callbackNotifier;
     private DocumentSplitConsumer consumer;
     private Channel channel;
 
@@ -50,9 +53,10 @@ class DocumentSplitConsumerTest {
         mediaMapper = mock(MediaMapper.class);
         mediaTaskMapper = mock(MediaTaskMapper.class);
         minioStorage = mock(MinioStorage.class);
+        callbackNotifier = mock(CallbackNotifier.class);
         channel = mock(Channel.class);
         WorkerProperties props = new WorkerProperties(tempDir.toString(), 3, 21600, 1);
-        consumer = new DocumentSplitConsumer(mediaMapper, mediaTaskMapper, minioStorage, props);
+        consumer = new DocumentSplitConsumer(mediaMapper, mediaTaskMapper, minioStorage, props, callbackNotifier);
     }
 
     @Test
@@ -91,6 +95,7 @@ class DocumentSplitConsumerTest {
         verify(minioStorage).uploadFile(eq(ObjectKeys.chapter(sourceId, 3)), any(Path.class), anyString());
         verify(mediaMapper).updateStatus(sourceId, MediaStatus.FINISHED);
         verify(mediaTaskMapper).updateFinished(taskId, MediaTaskStatus.SUCCESS, null);
+        verify(callbackNotifier).notifyAsync(any(CallbackPayload.class));
         verify(channel).basicAck(1L, false);
     }
 
@@ -111,6 +116,7 @@ class DocumentSplitConsumerTest {
         verify(mediaTaskMapper).updateFinished(eq(taskId), eq(MediaTaskStatus.FAILED), anyString());
         verify(minioStorage).removePrefix(ObjectKeys.chapterPrefix(sourceId));
         verify(mediaMapper).deleteByParentFileId(sourceId);
+        verify(callbackNotifier).notifyAsync(any(CallbackPayload.class));
         verify(channel).basicAck(2L, false);
     }
 

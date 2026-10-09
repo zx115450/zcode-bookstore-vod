@@ -68,9 +68,11 @@ vod:
     l2-enabled: ${VOD_PREVIEW_L2_ENABLED:false}
     seconds: ${VOD_PREVIEW_SECONDS:30}
     max-seconds: ${VOD_PREVIEW_MAX_SECONDS:1800}
-  # 步骤 13 Webhook：为空则跳过；演示可指向 vod-api 的 /vod/callback/test
+  # 步骤 13 Webhook：为空则跳过；书城切章回调示例 http://host.docker.internal:8081/api/internal/media/callback
   callback:
     url: ${VOD_CALLBACK_URL:}
+    # 与书城 BOOKSTORE_MEDIA_TOKEN / 媒资 VOD_INTERNAL_TOKEN 对齐
+    auth-token: ${VOD_CALLBACK_AUTH_TOKEN:${VOD_INTERNAL_TOKEN:}}
     connect-timeout-ms: ${VOD_CALLBACK_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${VOD_CALLBACK_READ_TIMEOUT_MS:3000}
     max-attempts: ${VOD_CALLBACK_MAX_ATTEMPTS:3}
